@@ -1,6 +1,7 @@
 package confluence
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,10 +61,27 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 
+	// Buffer the request body so it can be replayed on retries.
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+		req.Body.Close()
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
 			slog.Debug("Retrying request", "attempt", attempt, "url", req.URL.String())
+		}
+
+		// Reset body for each attempt
+		if bodyBytes != nil {
+			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			req.ContentLength = int64(len(bodyBytes))
 		}
 
 		resp, err := c.httpClient.Do(req)
