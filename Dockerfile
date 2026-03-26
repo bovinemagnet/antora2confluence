@@ -9,4 +9,7 @@ RUN apk add --no-cache \
       asciidoctor-kroki
 
 WORKDIR /src
+
+# KROKI_SERVER_URL can be set via environment to point to a local Kroki instance
+# e.g. docker-compose sets KROKI_SERVER_URL=http://kroki:8000
 ENTRYPOINT ["asciidoctor"]

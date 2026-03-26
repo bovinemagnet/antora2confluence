@@ -152,6 +152,58 @@ The tool will:
 
 TIP: Add `--verbose` for detailed logging during your first publish to understand exactly what is happening.
 
+== Using Docker or Podman
+
+If you prefer not to install asciidoctor and its extensions locally, you can run them inside a container.
+
+=== Standalone Container
+
+Build the bundled image:
+
+[source,bash]
+----
+docker build -t antora2confluence/asciidoctor .
+----
+
+Then use the `--use-docker` flag (or `--use-podman` for Podman):
+
+[source,bash]
+----
+antora-confluence publish --config publish.yaml --use-docker
+----
+
+=== With Kroki Diagram Rendering
+
+For diagram support (Mermaid, PlantUML, Ditaa, and more), use the included `compose.yaml` which runs Kroki alongside asciidoctor:
+
+[source,bash]
+----
+docker compose up -d kroki mermaid
+----
+
+This starts the Kroki diagram server on port 8000 and its Mermaid companion.
+Configure your `publish.yaml` to use the `asciidoctor-kroki` extension:
+
+[source,yaml]
+----
+render:
+  backend: docker
+  extensions:
+    - asciidoctor-kroki
+  dockerImage: antora2confluence/asciidoctor
+----
+
+The compose service sets `KROKI_SERVER_URL=http://kroki:8000` automatically, so diagrams are rendered locally without calling any external service.
+
+To stop the Kroki services:
+
+[source,bash]
+----
+docker compose down
+----
+
+NOTE: If your Confluence instance has a native Mermaid plugin, you can use `render.mermaidMode: confluence-macro` instead — this embeds the Mermaid source directly and lets Confluence render it, without needing Kroki at all.
+
 == Next Steps
 
 * xref:configuration.adoc[Configuration Reference] — full documentation of every configuration option

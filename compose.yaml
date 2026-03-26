@@ -1,0 +1,30 @@
+services:
+  # Kroki diagram rendering server
+  # Supports: PlantUML, Mermaid, Ditaa, GraphViz, BPMN, and more
+  kroki:
+    image: docker.io/yuzutech/kroki:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - KROKI_MERMAID_HOST=mermaid
+    depends_on:
+      - mermaid
+
+  # Mermaid rendering companion for Kroki
+  mermaid:
+    image: docker.io/yuzutech/kroki-mermaid:latest
+    expose:
+      - "8002"
+
+  # Asciidoctor with diagram extensions, configured to use local Kroki
+  asciidoctor:
+    build: .
+    environment:
+      - KROKI_SERVER_URL=http://kroki:8000
+    volumes:
+      - .:/src:ro
+    entrypoint: ["asciidoctor"]
+    depends_on:
+      - kroki
+    profiles:
+      - render

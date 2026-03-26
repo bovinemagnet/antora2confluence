@@ -45,6 +45,10 @@ sync:
   strict: false
 
 render:
+  backend: local
+  extensions: []
+  mermaidMode: passthrough
+  dockerImage: antora2confluence/asciidoctor
   failOnUnresolvedXref: false
   uploadImages: true
 
@@ -181,6 +185,22 @@ Controls the AsciiDoc rendering pipeline.
 |===
 | Key | Default | Description
 
+| `backend`
+| `local`
+| How asciidoctor is invoked. `local` calls the `asciidoctor` binary on PATH. `docker` and `podman` run it inside a container. Can be overridden with `--use-docker` or `--use-podman` CLI flags.
+
+| `extensions`
+| _(empty)_
+| List of asciidoctor extensions to require (passed as `-r` flags). For example, `["asciidoctor-diagram"]` or `["asciidoctor-kroki"]`.
+
+| `mermaidMode`
+| `passthrough`
+| How Mermaid diagram blocks are handled. `passthrough` renders them as code blocks (default). `confluence-macro` converts them to Confluence's native `ac:structured-macro` mermaid format (requires a Confluence Mermaid plugin).
+
+| `dockerImage`
+| `antora2confluence/asciidoctor`
+| Container image name used when `backend` is `docker` or `podman`. The project ships a `Dockerfile` that bundles asciidoctor with diagram extensions.
+
 | `failOnUnresolvedXref`
 | `false`
 | When `true`, the tool exits with an error if any `xref:` macro cannot be resolved to a Confluence page link.
@@ -230,6 +250,10 @@ If omitted, no file is written.
 | `sync.stateFile` | `.antora-confluence-state.json`
 | `sync.orphanStrategy` | `report`
 | `sync.strict` | `false`
+| `render.backend` | `local`
+| `render.extensions` | _(empty)_
+| `render.mermaidMode` | `passthrough`
+| `render.dockerImage` | `antora2confluence/asciidoctor`
 | `render.failOnUnresolvedXref` | `false`
 | `render.uploadImages` | `true`
 | `dryRun` | `false`
