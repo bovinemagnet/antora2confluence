@@ -9,9 +9,13 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+// PageTitleMap maps relative page paths (without extension) to their titles.
+// Used to resolve internal xref links to Confluence page links.
+type PageTitleMap map[string]string
+
 // TransformToConfluence converts asciidoctor HTML5 output into
 // Confluence storage format markup.
-func TransformToConfluence(htmlContent string) (string, error) {
+func TransformToConfluence(htmlContent string, pageTitles PageTitleMap) (string, error) {
 	if htmlContent == "" {
 		return "", nil
 	}
@@ -26,13 +30,13 @@ func TransformToConfluence(htmlContent string) (string, error) {
 
 	var buf bytes.Buffer
 	for _, n := range nodes {
-		transformNode(&buf, n)
+		transformNode(&buf, n, pageTitles)
 	}
 
 	return strings.TrimSpace(buf.String()), nil
 }
 
-func transformNode(buf *bytes.Buffer, n *html.Node) {
+func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 	switch n.Type {
 	case html.TextNode:
 		buf.WriteString(n.Data)
@@ -41,7 +45,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node) {
 		// handled below
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 		return
 	}
@@ -60,7 +64,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node) {
 			return
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 		return
 	}
@@ -72,7 +76,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node) {
 
 	if n.Data == "span" && strings.Contains(getAttr(n, "class"), "image") {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 		return
 	}
@@ -80,7 +84,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node) {
 	if len(n.Data) == 2 && n.Data[0] == 'h' && n.Data[1] >= '1' && n.Data[1] <= '6' {
 		buf.WriteString("<" + n.Data + ">")
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 		buf.WriteString("</" + n.Data + ">")
 		return
@@ -95,28 +99,67 @@ func transformNode(buf *bytes.Buffer, n *html.Node) {
 	case "p", "ul", "ol", "li", "strong", "em", "code", "blockquote", "pre", "sup", "sub":
 		buf.WriteString("<" + n.Data + ">")
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 		buf.WriteString("</" + n.Data + ">")
 	case "a":
-		buf.WriteString(`<a`)
-		if href := getAttr(n, "href"); href != "" {
-			buf.WriteString(fmt.Sprintf(` href="%s"`, href))
+		href := getAttr(n, "href")
+		if pageTitles != nil && isInternalLink(href) {
+			// Convert internal xref to Confluence page link
+			baseName := strings.TrimSuffix(href, ".html")
+			if title, ok := pageTitles[baseName]; ok {
+				buf.WriteString(`<ac:link><ri:page ri:content-title="`)
+				buf.WriteString(html.EscapeString(title))
+				buf.WriteString(`"/>`)
+				// Include link text as link body
+				var linkText bytes.Buffer
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					extractText(&linkText, c)
+				}
+				if linkText.Len() > 0 {
+					buf.WriteString(`<ac:link-body>`)
+					buf.WriteString(linkText.String())
+					buf.WriteString(`</ac:link-body>`)
+				}
+				buf.WriteString(`</ac:link>`)
+			} else {
+				// Internal link but title not found — render as plain link
+				writePassthroughLink(buf, n, href, pageTitles)
+			}
+		} else {
+			writePassthroughLink(buf, n, href, pageTitles)
 		}
-		buf.WriteString(">")
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
-		}
-		buf.WriteString("</a>")
 	case "br":
 		buf.WriteString("<br/>")
 	case "hr":
 		buf.WriteString("<hr/>")
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c)
+			transformNode(buf, c, pageTitles)
 		}
 	}
+}
+
+func isInternalLink(href string) bool {
+	if href == "" {
+		return false
+	}
+	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "#") {
+		return false
+	}
+	return strings.HasSuffix(href, ".html")
+}
+
+func writePassthroughLink(buf *bytes.Buffer, n *html.Node, href string, pageTitles PageTitleMap) {
+	buf.WriteString(`<a`)
+	if href != "" {
+		buf.WriteString(fmt.Sprintf(` href="%s"`, href))
+	}
+	buf.WriteString(">")
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		transformNode(buf, c, pageTitles)
+	}
+	buf.WriteString("</a>")
 }
 
 func transformAdmonition(buf *bytes.Buffer, n *html.Node, class string) {

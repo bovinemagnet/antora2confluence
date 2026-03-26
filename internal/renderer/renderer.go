@@ -4,13 +4,16 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/bovinemagnet/antora2confluence/internal/model"
 )
 
 // Renderer converts AsciiDoc pages to Confluence storage format
 // via the asciidoctor CLI and HTML transformation.
-type Renderer struct{}
+type Renderer struct {
+	pageTitles PageTitleMap
+}
 
 // New creates a new Renderer.
 func New() *Renderer {
@@ -25,7 +28,7 @@ func (r *Renderer) Render(page model.Page) (*model.RenderedPage, error) {
 		return nil, fmt.Errorf("rendering %s: %w", page.RelPath, err)
 	}
 
-	body, err := TransformToConfluence(htmlContent)
+	body, err := TransformToConfluence(htmlContent, r.pageTitles)
 	if err != nil {
 		return nil, fmt.Errorf("transforming %s: %w", page.RelPath, err)
 	}
@@ -47,6 +50,13 @@ func (r *Renderer) Render(page model.Page) (*model.RenderedPage, error) {
 // RenderAll renders a slice of pages. Pages that fail to render are
 // collected as errors rather than stopping the entire batch.
 func (r *Renderer) RenderAll(pages []model.Page) ([]model.RenderedPage, []error) {
+	// Build page title map for xref resolution
+	r.pageTitles = make(PageTitleMap, len(pages))
+	for _, page := range pages {
+		baseName := strings.TrimSuffix(page.RelPath, ".adoc")
+		r.pageTitles[baseName] = page.Title
+	}
+
 	var rendered []model.RenderedPage
 	var errs []error
 
