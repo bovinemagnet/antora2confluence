@@ -36,6 +36,31 @@ func TestGetChildPages_ReturnsList(t *testing.T) {
 	assert.Len(t, pages, 2)
 }
 
+func TestGetChildPages_FollowsPagination(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if callCount == 1 {
+			json.NewEncoder(w).Encode(PageList{
+				Results: []Page{{ID: "101", Title: "Child 1"}},
+				Links:   &Links{Next: "/api/v2/pages/100/children?cursor=abc"},
+			})
+		} else {
+			json.NewEncoder(w).Encode(PageList{
+				Results: []Page{{ID: "102", Title: "Child 2"}},
+			})
+		}
+	}))
+	defer server.Close()
+	c := NewClient(server.URL+"/wiki", "user", "token")
+	pages, err := c.GetChildPages("100")
+	require.NoError(t, err)
+	assert.Len(t, pages, 2)
+	assert.Equal(t, "101", pages[0].ID)
+	assert.Equal(t, "102", pages[1].ID)
+	assert.Equal(t, 2, callCount)
+}
+
 func TestGetPageByTitle_Found(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/wiki/api/v2/pages", r.URL.Path)

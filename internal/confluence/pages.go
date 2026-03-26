@@ -25,21 +25,35 @@ func (c *Client) GetPage(id string) (*Page, error) {
 	return &page, nil
 }
 
+// GetChildPages returns all child pages of a given page, following pagination.
 func (c *Client) GetChildPages(parentID string) ([]Page, error) {
+	var allPages []Page
 	reqURL := fmt.Sprintf("%s/api/v2/pages/%s/children", c.baseURL, parentID)
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, err
+
+	for reqURL != "" {
+		req, err := http.NewRequest("GET", reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := c.do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		var list PageList
+		if err := c.decodeResponse(resp, &list); err != nil {
+			return nil, err
+		}
+		allPages = append(allPages, list.Results...)
+
+		reqURL = ""
+		if list.Links != nil && list.Links.Next != "" {
+			reqURL = c.baseURL + list.Links.Next
+		}
 	}
-	resp, err := c.do(req)
-	if err != nil {
-		return nil, err
-	}
-	var list PageList
-	if err := c.decodeResponse(resp, &list); err != nil {
-		return nil, err
-	}
-	return list.Results, nil
+
+	return allPages, nil
 }
 
 func (c *Client) GetPageByTitle(spaceID, title string) (*Page, error) {
