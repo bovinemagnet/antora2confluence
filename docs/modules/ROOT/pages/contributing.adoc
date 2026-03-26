@@ -1,0 +1,131 @@
+= Contributing
+Paul Snow
+v0.0.0
+:description: Developer guide for building, testing, and contributing to antora2confluence.
+
+Contributions are welcome.
+This page covers the tools and conventions used in the project so you can get up and running quickly.
+
+== Building
+
+Build the `antora-confluence` binary from source:
+
+[source,bash]
+----
+go build -o antora-confluence ./cmd/antora-confluence/
+----
+
+To build all packages without producing a binary (useful for checking compilation):
+
+[source,bash]
+----
+go build ./...
+----
+
+== Testing
+
+The project has 110 tests spread across 10 packages.
+Run the full test suite:
+
+[source,bash]
+----
+go test ./...
+----
+
+Run tests for a single package:
+
+[source,bash]
+----
+go test ./internal/discovery/
+----
+
+Run a single named test:
+
+[source,bash]
+----
+go test -run TestPageIdentityString ./internal/model/
+----
+
+Run tests with verbose output to see individual test names:
+
+[source,bash]
+----
+go test -v ./...
+----
+
+NOTE: Some tests in the `confluence` and `publisher` packages use HTTP test servers and do not require a real Confluence instance.
+No external services are needed to run the full test suite.
+
+== Static Analysis
+
+Run the Go vet tool to catch common mistakes:
+
+[source,bash]
+----
+go vet ./...
+----
+
+== Formatting
+
+All Go source files must be formatted with `gofmt`.
+Apply formatting in place:
+
+[source,bash]
+----
+go fmt ./...
+----
+
+A CI check will fail if any files are not correctly formatted.
+Run `go fmt ./...` before committing.
+
+== Project Structure
+
+[source,text]
+----
+antora2confluence/
+├── cmd/
+│   └── antora-confluence/   # Main entry point; Cobra command definitions
+├── internal/
+│   ├── config/              # YAML config loading with Viper
+│   ├── confluence/          # Confluence Cloud v2 API client
+│   ├── depgraph/            # Dependency graph (include/image tracking)
+│   ├── diff/                # Fingerprint-based change detection
+│   ├── discovery/           # Antora source scanner
+│   ├── model/               # Domain types
+│   ├── publisher/           # Publish orchestration
+│   ├── renderer/            # asciidoctor CLI wrapper and HTML transformer
+│   ├── reporter/            # Console and JSON output
+│   └── state/               # Local JSON state store
+├── testdata/                # Test fixtures (sample Antora repos, config files)
+├── docs/                    # This documentation site (Antora format)
+├── go.mod
+└── go.sum
+----
+
+=== `cmd/antora-confluence/`
+
+Contains the `main` package and the four Cobra command definitions (`validate`, `plan`, `publish`, `reconcile-state`).
+Command flags are defined here and passed into the appropriate internal package.
+
+=== `internal/`
+
+All application logic lives under `internal/` to prevent external packages from importing it as a library.
+Each subdirectory is a single package corresponding to one of the pipeline stages described in xref:architecture.adoc[Architecture].
+
+=== `testdata/`
+
+Contains sample Antora repositories used by unit and integration tests:
+
+* `testdata/valid-repo/` — a well-formed Antora component used by `discovery` and `renderer` tests
+* `testdata/invalid-repo/` — a deliberately malformed repo used to test error handling in `discovery`
+
+When adding new test fixtures, place them under `testdata/` and reference them with paths relative to the repository root using `filepath.Join` in test code.
+
+== Submitting Changes
+
+. Fork the repository and create a feature branch
+. Write tests for any new behaviour (TDD is preferred for changes to existing functionality)
+. Ensure `go test ./...`, `go vet ./...`, and `go fmt ./...` all pass
+. Open a pull request with a clear description of the change and the motivation for it
+
+TIP: For significant changes, open an issue first to discuss the approach before investing time in implementation.

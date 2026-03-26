@@ -1,0 +1,229 @@
+= CLI Commands
+Paul Snow
+v0.0.0
+:description: Reference documentation for the four antora-confluence CLI commands: validate, plan, publish, and reconcile-state.
+
+The `antora-confluence` binary provides four commands that support a safe, incremental publishing workflow.
+All commands accept a common set of global flags.
+
+== Global Flags
+
+[cols="1,1,3",options="header"]
+|===
+| Flag | Default | Description
+
+| `--config`
+| _(required)_
+| Path to the YAML configuration file (e.g. `publish.yaml`).
+
+| `--verbose`
+| `false`
+| Enable detailed logging output.
+
+| `--help`
+| —
+| Display help for the command.
+|===
+
+== `validate`
+
+Scans the Antora source directory and reports a full content inventory.
+No Confluence credentials are required; the command makes no network calls.
+
+Use `validate` to verify your Antora structure is correct before running `plan` or `publish`.
+
+=== Usage
+
+[source,bash]
+----
+antora-confluence validate --config publish.yaml
+----
+
+=== What It Checks
+
+* Presence and validity of `antora.yml` in each component
+* Well-formed `nav.adoc` files
+* Consistent component/version/module structure
+* Page file existence for all navigation entries
+* Image references that point to existing files
+
+=== Example Output
+
+[source,text]
+----
+antora2confluence validate
+=========================
+Source root: .
+
+Components found: 2
+  my-component (version: 1.0)
+    Modules: ROOT, api
+    Pages: 12
+    Images: 3
+    Nav entries: 12
+
+  another-component (version: 2.1)
+    Modules: ROOT
+    Pages: 5
+    Images: 0
+    Nav entries: 5
+
+Total pages: 17
+Total images: 3
+
+Validation passed.
+----
+
+NOTE: A successful `validate` run does not guarantee that all xrefs resolve correctly.
+Xref resolution is performed during the render step, which requires Confluence credentials.
+
+== `plan`
+
+Performs a full dry-run of the publish pipeline, showing exactly which pages would be created, updated, skipped, or flagged as orphaned.
+Confluence credentials are required to fetch existing page metadata for comparison.
+No pages are created or modified.
+
+=== Usage
+
+[source,bash]
+----
+antora-confluence plan --config publish.yaml
+----
+
+=== Output
+
+Each page is listed with its planned action and the reason for that action:
+
+[source,text]
+----
+antora2confluence plan
+======================
+Connecting to Confluence... OK
+
+Planned actions:
+  CREATE  my-site/my-component/1.0/ROOT/index        (new page)
+  CREATE  my-site/my-component/1.0/ROOT/getting-started  (new page)
+  UPDATE  my-site/my-component/1.0/api/reference     (content changed)
+  SKIP    my-site/my-component/1.0/ROOT/overview      (no change)
+  ORPHAN  my-site/my-component/0.9/ROOT/old-page      (source removed)
+
+Summary: 2 create, 1 update, 1 skip, 1 orphan
+----
+
+TIP: Run `plan` after every significant change to verify the scope of the upcoming publish before committing to it.
+
+== `publish`
+
+Executes the full publish pipeline: discovery, rendering, fingerprinting, diffing, publishing, image upload, state persistence, and reporting.
+
+=== Usage
+
+[source,bash]
+----
+antora-confluence publish --config publish.yaml [flags]
+----
+
+=== Flags
+
+[cols="1,1,3",options="header"]
+|===
+| Flag | Default | Description
+
+| `--config`
+| _(required)_
+| Path to the configuration file.
+
+| `--full`
+| `false`
+| Force a full publish, re-publishing every page regardless of fingerprint state.
+Equivalent to setting `sync.mode: full` in the configuration file.
+
+| `--verbose`
+| `false`
+| Enable detailed per-page logging.
+|===
+
+=== Pipeline Steps
+
+The `publish` command executes the following steps in order:
+
+. Load and validate configuration
+. Verify Confluence authentication
+. Discover all Antora content (components, versions, modules, pages)
+. Render AsciiDoc pages to Confluence HTML via `asciidoctor`
+. Build dependency graph (include directives, image references)
+. Compute fingerprints for each page and its dependencies
+. Load local state file; reconcile with Confluence page properties
+. Plan actions (create / update / skip / orphan) per page
+. Create hierarchy pages (component, version, module parent pages)
+. Execute the plan — create or update pages via Confluence API
+. Upload images as Confluence attachments
+. Persist updated state to the state file
+. Emit console summary and optional JSON report
+
+=== Example Output
+
+[source,text]
+----
+antora2confluence publish
+=========================
+Connecting to Confluence... OK
+Discovering content... 17 pages found
+Rendering pages... done
+Computing fingerprints... done
+Loading state... done
+Planning... 2 create, 1 update, 14 skip
+
+Creating hierarchy pages... done
+Publishing pages:
+  [CREATE] my-site/my-component/1.0/ROOT/index
+  [CREATE] my-site/my-component/1.0/ROOT/getting-started
+  [UPDATE] my-site/my-component/1.0/api/reference
+Uploading images... 3 uploaded
+Saving state... done
+
+Publish complete.
+  Created:  2
+  Updated:  1
+  Skipped:  14
+  Orphaned: 0
+  Errors:   0
+
+Report written to: publish-report.json
+----
+
+== `reconcile-state`
+
+Rebuilds the local state file by reading page properties stored directly on Confluence pages.
+Use this command when the local state file has been lost, corrupted, or is out of sync with Confluence.
+
+=== Usage
+
+[source,bash]
+----
+antora-confluence reconcile-state --config publish.yaml
+----
+
+=== When to Use
+
+* The state file was accidentally deleted or not committed to version control
+* You are adopting `antora-confluence` for a space that was previously managed manually
+* A failed publish left the state file and Confluence pages in an inconsistent state
+
+WARNING: `reconcile-state` overwrites the existing state file.
+Back up your current state file before running this command if you are unsure.
+
+=== Example Output
+
+[source,text]
+----
+antora2confluence reconcile-state
+==================================
+Connecting to Confluence... OK
+Scanning Confluence space DOCS under parent page 123456...
+Found 14 pages with antora2confluence properties.
+
+Reconciled state written to: .antora-confluence-state.json
+----
+
+After running `reconcile-state`, run `plan` to verify the reconciled state matches your expectations before the next `publish`.

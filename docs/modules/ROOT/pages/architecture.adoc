@@ -1,0 +1,143 @@
+= Architecture
+Paul Snow
+v0.0.0
+:description: Internal architecture of antora2confluence, covering the ten packages, data flow, and the page identity model.
+
+`antora-confluence` is structured as a single Go binary with ten internal packages, each responsible for a distinct concern in the publish pipeline.
+This separation makes it straightforward to test each stage in isolation and to extend the tool with new renderers, sync strategies, or reporting formats.
+
+== Internal Packages
+
+=== `model`
+
+Defines the core domain types shared across packages:
+
+* `Page` — a discovered Antora page with its component, version, module, and relative path
+* `RenderedPage` — a `Page` with its rendered Confluence HTML content
+* `PublishPlan` — the set of planned actions (create, update, skip, orphan) for a given run
+* `PublishResult` — the outcome of executing a `PublishPlan`, including per-page results and aggregate counts
+
+=== `config`
+
+Loads and validates the `publish.yaml` configuration file using https://github.com/spf13/viper[Viper].
+Merges values from the config file, environment variables, and CLI flags according to the precedence rules described in xref:configuration.adoc[Configuration Reference].
+Exposes a single, validated `Config` struct to the rest of the application.
+
+=== `discovery`
+
+Scans the Antora source tree to produce a list of `Page` objects.
+Responsibilities:
+
+* Locating `antora.yml` files to identify components and versions
+* Walking the `modules/` directory structure to find pages
+* Parsing `nav.adoc` files to determine page ordering and hierarchy
+* Collecting image file references
+
+=== `renderer`
+
+Converts AsciiDoc source to Confluence-compatible HTML.
+Responsibilities:
+
+* Invoking the `asciidoctor` CLI as a subprocess, capturing stdout
+* Transforming the raw HTML output into Confluence storage format
+* Resolving `xref:` macros to live Confluence page URLs
+* Rewriting image `src` attributes to Confluence attachment URLs (post-upload)
+
+=== `depgraph`
+
+Builds a directed dependency graph of all pages, tracking:
+
+* AsciiDoc `include::` directives (partial includes)
+* Image file references
+
+The graph is used during fingerprinting to ensure that a change to a shared partial or image causes all pages that depend on it to be re-published, even if their own source has not changed.
+
+=== `diff`
+
+Computes a content fingerprint (SHA-256 hash) for each page, incorporating the page's own rendered content and the fingerprints of all its dependencies.
+Compares current fingerprints against the stored state to produce a `PublishPlan` containing the action for each page: `create`, `update`, `skip`, or `orphan`.
+
+=== `confluence`
+
+A typed HTTP client for the Confluence Cloud REST API v2.
+Features:
+
+* Page creation and update (with version increment)
+* Page metadata and property read/write
+* Attachment upload
+* Label management
+* Automatic retry with exponential back-off on transient errors
+* Rate-limit handling (HTTP 429 with `Retry-After` header)
+
+=== `publisher`
+
+Orchestrates the full publish pipeline.
+Responsibilities:
+
+* Creating hierarchy pages (component, version, module parent pages) before publishing leaf pages
+* Iterating over the `PublishPlan` and calling the `confluence` client for each action
+* Coordinating image uploads via the `confluence` client
+* Collecting per-page results into a `PublishResult`
+
+=== `state`
+
+Manages the local JSON state file.
+The state file records the Confluence page ID, current fingerprint, and last-published timestamp for every page that has been successfully published.
+The `state` package provides:
+
+* Load — reads and deserialises the state file
+* Save — serialises and writes updated state atomically
+* Reconcile — rebuilds state by reading page properties from Confluence (used by `reconcile-state`)
+
+=== `reporter`
+
+Formats and emits publish results.
+Supports two output modes:
+
+* *Console* — a human-readable summary printed to stdout after the publish completes
+* *JSON* — a machine-readable report written to the file specified by `reportFile`, suitable for CI dashboards and audit logs
+
+== Data Flow
+
+The following steps describe the end-to-end flow when `antora-confluence publish` is invoked:
+
+. *Load config* — parse `publish.yaml`, resolve environment variables, apply CLI flag overrides
+. *Validate Confluence auth* — verify credentials by making a lightweight API call; exit early on failure
+. *Discover Antora content* — walk the source tree; produce a list of `Page` objects
+. *Render pages* — invoke `asciidoctor` for each page; transform output to Confluence HTML; store as `RenderedPage` objects
+. *Build dependency graph* — scan rendered content for `include::` and image references; build the `depgraph`
+. *Compute fingerprints* — SHA-256 hash each `RenderedPage` plus the fingerprints of all its graph dependencies
+. *Load state and reconcile* — read the local state file; optionally reconcile against Confluence page properties to detect drift
+. *Plan actions* — compare current fingerprints with stored state; assign `create`, `update`, `skip`, or `orphan` to each page
+. *Create hierarchy pages* — ensure component, version, and module parent pages exist in Confluence before publishing leaf pages
+. *Execute plan* — for each `create` or `update` action, call the Confluence API; record the result
+. *Upload images* — upload new or changed images as attachments to their respective pages
+. *Persist state* — write the updated state file with new page IDs, fingerprints, and timestamps
+. *Emit report* — print the console summary; write the JSON report file if configured
+
+== Page Identity Model
+
+Every page published by `antora-confluence` is assigned a stable, human-readable identity string:
+
+[source,text]
+----
+<siteKey>/<component>/<version>/<module>/<relative-page-path>
+----
+
+For example:
+
+[source,text]
+----
+my-site/my-component/1.0/ROOT/getting-started
+my-site/my-component/1.0/api/reference/endpoints
+----
+
+This identity string is stored as a Confluence page property (`antora2confluence.pageId`) on every published page.
+It serves three purposes:
+
+. *Deduplication* — prevents the same page from being created twice if the state file is lost
+. *Reconciliation* — allows `reconcile-state` to rebuild the local state by scanning Confluence page properties
+. *Xref resolution* — maps Antora `xref:` targets to Confluence page IDs during rendering
+
+The `siteKey` segment is set in the configuration file and must remain consistent across all runs for a given documentation site.
+Changing the `siteKey` will cause every page to be treated as new on the next publish.

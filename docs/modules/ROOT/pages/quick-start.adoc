@@ -1,0 +1,159 @@
+= Quick Start
+Paul Snow
+v0.0.0
+:description: Step-by-step guide to installing, configuring, and running antora2confluence for the first time.
+
+This guide walks you through installing `antora-confluence`, creating a configuration file, and publishing your first Antora documentation site to Confluence Cloud.
+
+== Step 1: Install Prerequisites
+
+=== Go
+
+Download and install Go 1.23 or later from https://go.dev/dl/.
+Verify the installation:
+
+[source,bash]
+----
+go version
+----
+
+=== Asciidoctor
+
+Install the `asciidoctor` Ruby gem:
+
+[source,bash]
+----
+gem install asciidoctor
+----
+
+Verify:
+
+[source,bash]
+----
+asciidoctor --version
+----
+
+== Step 2: Build from Source
+
+Clone the repository and build the binary:
+
+[source,bash]
+----
+git clone https://github.com/bovinemagnet/antora2confluence.git
+cd antora2confluence
+go build -o antora-confluence ./cmd/antora-confluence/
+----
+
+Move the binary to a directory on your `PATH`, for example:
+
+[source,bash]
+----
+mv antora-confluence /usr/local/bin/
+----
+
+== Step 3: Create a Configuration File
+
+Create a file named `publish.yaml` in your documentation project root.
+The following example shows all available sections:
+
+[source,yaml]
+----
+confluence:
+  baseUrl: https://your-org.atlassian.net/wiki
+  spaceKey: DOCS
+  parentPageId: "123456"
+  auth:
+    mode: env
+    usernameEnv: CONFLUENCE_USER
+    tokenEnv: CONFLUENCE_TOKEN
+
+source:
+  antoraRoot: .          # path to the directory containing antora-playbook.yml
+  siteKey: my-site       # unique key used in page identity strings
+
+publish:
+  hierarchy: true        # create component/version/module parent pages
+  versionMode: append    # how the version label is handled
+  createIndexPages: true # auto-create index pages for hierarchy nodes
+  applyLabels: true      # apply labels to published pages
+
+sync:
+  mode: incremental      # incremental or full
+  stateFile: .antora-confluence-state.json
+  orphanStrategy: report # report orphaned pages rather than deleting
+  strict: false
+
+render:
+  failOnUnresolvedXref: false
+  uploadImages: true
+
+dryRun: false
+verbose: false
+reportFile: publish-report.json
+----
+
+== Step 4: Set Environment Variables
+
+`antora-confluence` reads Confluence credentials from environment variables.
+Set them in your shell or CI environment:
+
+[source,bash]
+----
+export CONFLUENCE_USER=your.email@example.com
+export CONFLUENCE_TOKEN=your-api-token
+----
+
+Generate an API token from your Atlassian account at https://id.atlassian.com/manage-profile/security/api-tokens.
+
+NOTE: Never commit credentials to version control.
+Use a secrets manager or CI secret store to inject these variables at runtime.
+
+== Step 5: Validate Your Antora Source
+
+Before connecting to Confluence, check that your Antora source is well-formed:
+
+[source,bash]
+----
+antora-confluence validate --config publish.yaml
+----
+
+This command scans your Antora content, reports a full inventory of components, versions, modules, and pages, and highlights any structural issues.
+No Confluence connection is required.
+
+== Step 6: Preview Changes
+
+Run a dry-run to see exactly what `antora-confluence` would create, update, or skip:
+
+[source,bash]
+----
+antora-confluence plan --config publish.yaml
+----
+
+The output shows each planned action alongside the reason (new page, content changed, dependency changed, or no change).
+
+== Step 7: Publish
+
+When you are satisfied with the plan, publish to Confluence:
+
+[source,bash]
+----
+antora-confluence publish --config publish.yaml
+----
+
+The tool will:
+
+. Discover all Antora content
+. Render AsciiDoc to Confluence HTML
+. Compute fingerprints and compare with stored state
+. Create or update only the pages that have changed
+. Upload images as attachments
+. Save updated state
+. Emit a summary report
+
+TIP: Add `--verbose` for detailed logging during your first publish to understand exactly what is happening.
+
+== Next Steps
+
+* xref:configuration.adoc[Configuration Reference] — full documentation of every configuration option
+* xref:commands.adoc[CLI Commands] — detailed flags and output for each command
+* xref:architecture.adoc[Architecture] — how the tool works internally

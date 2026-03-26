@@ -1,0 +1,32 @@
+= Overview
+Paul Snow
+v0.0.0
+:description: Overview of antora2confluence, a Go CLI tool for publishing Antora documentation to Confluence Cloud.
+
+antora2confluence is a Go CLI tool that publishes Antora-structured AsciiDoc documentation repositories into Atlassian Confluence Cloud as structured page hierarchies.
+It treats your Git-based Antora source as the system of record and synchronises content to Confluence with incremental change detection, dependency-aware fingerprinting, and idempotent publishing.
+Run it in your CI pipeline or locally to keep your Confluence space up to date whenever documentation changes are merged.
+
+== Key Features
+
+* *Antora content discovery* — scans components, versions, modules, pages, and navigation files from any Antora-structured repository
+* *AsciiDoc rendering* — converts AsciiDoc source to Confluence-compatible HTML via the `asciidoctor` CLI
+* *Incremental change detection* — dependency-aware fingerprinting ensures only changed pages (and their dependants) are re-published
+* *Page hierarchy creation* — builds a structured hierarchy in Confluence: Root → Component → Version → Module → Page
+* *Image upload* — uploads local images as Confluence page attachments and rewrites references accordingly
+* *Internal xref resolution* — resolves Antora `xref:` macros to live Confluence page links
+* *Labels and page properties* — tags pages with labels and structured properties for traceability and reconciliation
+* *Confluence Cloud v2 API* — full support for the Confluence Cloud REST API v2 with automatic retry and rate-limit handling
+* *State management* — local JSON state file combined with Confluence page property reconciliation prevents duplicate pages and detects drift
+* *Reporting* — console summary and optional JSON report file for CI integration
+* *Four CLI commands* — `validate`, `plan`, `publish`, and `reconcile-state` support a safe, incremental workflow
+
+== Prerequisites
+
+* Go 1.23 or later
+* The `asciidoctor` Ruby gem installed and available on your `PATH`
+* A Confluence Cloud account with API token credentials
+
+== Get Started
+
+See xref:quick-start.adoc[Quick Start] to install, configure, and publish your first documentation site.

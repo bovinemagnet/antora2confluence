@@ -1,0 +1,237 @@
+= Configuration Reference
+Paul Snow
+v0.0.0
+:description: Full reference for the antora2confluence publish.yaml configuration file, including all options, defaults, and environment variable resolution.
+
+All configuration is supplied via a YAML file, typically named `publish.yaml`.
+You can override individual values with CLI flags or environment variables.
+
+== Configuration Precedence
+
+Values are resolved in the following order, from highest to lowest priority:
+
+. CLI flags (e.g. `--verbose`)
+. Environment variables
+. Configuration file values
+. Built-in defaults
+
+== Complete Example
+
+[source,yaml]
+----
+confluence:
+  baseUrl: https://your-org.atlassian.net/wiki
+  spaceKey: DOCS
+  parentPageId: "123456"
+  auth:
+    mode: env
+    usernameEnv: CONFLUENCE_USER
+    tokenEnv: CONFLUENCE_TOKEN
+
+source:
+  antoraRoot: .
+  siteKey: my-site
+
+publish:
+  hierarchy: true
+  versionMode: append
+  createIndexPages: true
+  applyLabels: true
+
+sync:
+  mode: incremental
+  stateFile: .antora-confluence-state.json
+  orphanStrategy: report
+  strict: false
+
+render:
+  failOnUnresolvedXref: false
+  uploadImages: true
+
+dryRun: false
+verbose: false
+reportFile: publish-report.json
+----
+
+== `confluence` Section
+
+Configures the target Confluence Cloud instance.
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `baseUrl`
+| _(required)_
+| The base URL of your Confluence Cloud instance, e.g. `\https://your-org.atlassian.net/wiki`.
+
+| `spaceKey`
+| _(required)_
+| The key of the Confluence space where pages will be published.
+
+| `parentPageId`
+| _(required)_
+| The numeric ID of the Confluence page that will serve as the root parent for all published content.
+
+| `auth.mode`
+| `env`
+| Authentication mode. Currently only `env` is supported, which reads credentials from environment variables.
+
+| `auth.usernameEnv`
+| `CONFLUENCE_USER`
+| Name of the environment variable containing the Confluence username (email address).
+
+| `auth.tokenEnv`
+| `CONFLUENCE_TOKEN`
+| Name of the environment variable containing the Confluence API token.
+|===
+
+=== Environment Variable Credential Resolution
+
+When `auth.mode` is `env`, the tool reads the username and token from the named environment variables at startup.
+If either variable is unset or empty, the tool exits with a clear error message before making any API calls.
+
+[source,bash]
+----
+export CONFLUENCE_USER=your.email@example.com
+export CONFLUENCE_TOKEN=your-api-token
+----
+
+WARNING: Do not set credentials directly in the configuration file.
+Use environment variables or a secrets manager to avoid accidentally committing credentials to version control.
+
+== `source` Section
+
+Configures the Antora source to be published.
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `antoraRoot`
+| `.`
+| Path to the directory containing the Antora playbook (`antora-playbook.yml`) or the root of the Antora content repository.
+
+| `siteKey`
+| _(required)_
+| A short, unique identifier for this site.
+Used as the first segment of every page's identity string: `<siteKey>/<component>/<version>/<module>/<page>`.
+Must be consistent across runs to avoid duplicate pages.
+|===
+
+== `publish` Section
+
+Controls how content is organised in Confluence.
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `hierarchy`
+| `true`
+| When `true`, creates intermediate parent pages for each component, version, and module, producing a structured hierarchy.
+When `false`, all pages are created directly under the root parent page.
+
+| `versionMode`
+| `append`
+| Controls how the component version is represented in the page title.
+`append` appends the version string to the component title.
+
+| `createIndexPages`
+| `true`
+| When `true`, automatically creates index pages for hierarchy nodes (components, versions, modules) that do not have an explicit `index.adoc`.
+
+| `applyLabels`
+| `true`
+| When `true`, applies Confluence labels to each published page for traceability.
+Labels include the site key, component name, version, and module.
+|===
+
+== `sync` Section
+
+Controls how the tool detects and handles changes between runs.
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `mode`
+| `incremental`
+| Synchronisation mode. `incremental` publishes only changed pages (based on fingerprints). `full` re-publishes every page regardless of state.
+
+| `stateFile`
+| `.antora-confluence-state.json`
+| Path to the local JSON file used to store page state between runs.
+Commit this file alongside your documentation source to preserve state across CI runs.
+
+| `orphanStrategy`
+| `report`
+| What to do when a page exists in Confluence but no longer has a corresponding source file. `report` logs the orphaned page but does not remove it.
+
+| `strict`
+| `false`
+| When `true`, the tool exits with a non-zero status code if any orphaned pages are detected.
+|===
+
+== `render` Section
+
+Controls the AsciiDoc rendering pipeline.
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `failOnUnresolvedXref`
+| `false`
+| When `true`, the tool exits with an error if any `xref:` macro cannot be resolved to a Confluence page link.
+When `false`, unresolved xrefs are logged as warnings and left as plain text.
+
+| `uploadImages`
+| `true`
+| When `true`, local images referenced in pages are uploaded as Confluence attachments and their references are rewritten to attachment URLs.
+|===
+
+== Top-Level Options
+
+[cols="1,1,3",options="header"]
+|===
+| Key | Default | Description
+
+| `dryRun`
+| `false`
+| When `true`, the tool performs all discovery, rendering, and planning steps but makes no changes to Confluence.
+Equivalent to running the `plan` command.
+
+| `verbose`
+| `false`
+| When `true`, enables detailed logging of each step in the pipeline.
+
+| `reportFile`
+| _(none)_
+| Path to write a JSON report file summarising the publish run.
+If omitted, no file is written.
+|===
+
+== Default Values Summary
+
+[cols="1,1",options="header"]
+|===
+| Configuration Key | Default Value
+
+| `confluence.auth.mode` | `env`
+| `confluence.auth.usernameEnv` | `CONFLUENCE_USER`
+| `confluence.auth.tokenEnv` | `CONFLUENCE_TOKEN`
+| `source.antoraRoot` | `.`
+| `publish.hierarchy` | `true`
+| `publish.versionMode` | `append`
+| `publish.createIndexPages` | `true`
+| `publish.applyLabels` | `true`
+| `sync.mode` | `incremental`
+| `sync.stateFile` | `.antora-confluence-state.json`
+| `sync.orphanStrategy` | `report`
+| `sync.strict` | `false`
+| `render.failOnUnresolvedXref` | `false`
+| `render.uploadImages` | `true`
+| `dryRun` | `false`
+| `verbose` | `false`
+|===
