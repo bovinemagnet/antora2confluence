@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/bovinemagnet/antora2confluence/internal/confluence"
@@ -115,6 +117,7 @@ func (p *Publisher) createPage(item model.PlanItem, rendered map[string]*model.R
 
 	slog.Info("Created page", "key", item.Page.PageKey, "id", page.ID, "title", rp.Title)
 	p.setMetadata(page.ID, item)
+	p.uploadImages(page.ID, rp)
 
 	version := 1
 	if page.Version != nil {
@@ -165,6 +168,7 @@ func (p *Publisher) updatePage(item model.PlanItem, rendered map[string]*model.R
 
 	slog.Info("Updated page", "key", item.Page.PageKey, "id", page.ID, "version", newVersion)
 	p.setMetadata(page.ID, item)
+	p.uploadImages(page.ID, rp)
 
 	return &model.PublishedPage{
 		PageKey:      item.Page.PageKey,
@@ -195,5 +199,35 @@ func (p *Publisher) setMetadata(pageID string, item model.PlanItem) {
 		Value: item.Fingerprint,
 	}); err != nil {
 		slog.Warn("Failed to set fingerprint property", "pageID", pageID, "error", err)
+	}
+}
+
+func (p *Publisher) uploadImages(pageID string, rp *model.RenderedPage) {
+	if len(rp.Images) == 0 {
+		return
+	}
+
+	// Resolve image directory from page's absolute path
+	// Page is at: .../modules/<mod>/pages/<page>.adoc
+	// Images are at: .../modules/<mod>/assets/images/
+	pageDir := filepath.Dir(rp.SourcePage.AbsPath)
+	// Go up from pages/ to module root, then into assets/images/
+	moduleDir := filepath.Dir(pageDir) // up from pages/ to module root
+	imagesDir := filepath.Join(moduleDir, "assets", "images")
+
+	for _, img := range rp.Images {
+		imgPath := filepath.Join(imagesDir, img)
+		f, err := os.Open(imgPath)
+		if err != nil {
+			slog.Warn("Image not found, skipping upload", "image", img, "path", imgPath, "error", err)
+			continue
+		}
+
+		if err := p.client.UploadAttachment(pageID, img, f); err != nil {
+			slog.Warn("Failed to upload image", "image", img, "pageID", pageID, "error", err)
+		} else {
+			slog.Debug("Uploaded image", "image", img, "pageID", pageID)
+		}
+		f.Close()
 	}
 }

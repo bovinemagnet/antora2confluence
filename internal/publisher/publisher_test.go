@@ -3,6 +3,8 @@ package publisher
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/bovinemagnet/antora2confluence/internal/confluence"
@@ -12,18 +14,20 @@ import (
 )
 
 type mockClient struct {
-	pages      map[string]*confluence.Page
-	properties map[string]map[string]*confluence.Property
-	labels     map[string][]string
-	nextID     int
+	pages       map[string]*confluence.Page
+	properties  map[string]map[string]*confluence.Property
+	labels      map[string][]string
+	attachments map[string][]string // pageID -> list of filenames
+	nextID      int
 }
 
 func newMockClient() *mockClient {
 	return &mockClient{
-		pages:      make(map[string]*confluence.Page),
-		properties: make(map[string]map[string]*confluence.Property),
-		labels:     make(map[string][]string),
-		nextID:     1000,
+		pages:       make(map[string]*confluence.Page),
+		properties:  make(map[string]map[string]*confluence.Property),
+		labels:      make(map[string][]string),
+		attachments: make(map[string][]string),
+		nextID:      1000,
 	}
 }
 
@@ -88,6 +92,7 @@ func (m *mockClient) GetPageProperty(pageID, key string) (*confluence.Property, 
 }
 
 func (m *mockClient) UploadAttachment(pageID, filename string, reader io.Reader) error {
+	m.attachments[pageID] = append(m.attachments[pageID], filename)
 	return nil
 }
 
@@ -184,4 +189,54 @@ func TestPublish_SetsLabelsAndProperties(t *testing.T) {
 	assert.Contains(t, mock.labels[createdID], "docs")
 	assert.NotNil(t, mock.properties[createdID]["antora-page-key"])
 	assert.NotNil(t, mock.properties[createdID]["antora-fingerprint"])
+}
+
+func TestPublish_UploadsImages(t *testing.T) {
+	mock := newMockClient()
+	pub := New(mock, "1", "space1", nil)
+
+	// Create a temp dir with an image in the expected location
+	dir := t.TempDir()
+	modDir := filepath.Join(dir, "modules", "ROOT")
+	pagesDir := filepath.Join(modDir, "pages")
+	imagesDir := filepath.Join(modDir, "assets", "images")
+	os.MkdirAll(pagesDir, 0755)
+	os.MkdirAll(imagesDir, 0755)
+	os.WriteFile(filepath.Join(imagesDir, "logo.png"), []byte("fake-png"), 0644)
+
+	pageAbsPath := filepath.Join(pagesDir, "index.adoc")
+
+	plan := model.PublishPlan{
+		Items: []model.PlanItem{
+			{
+				Page: model.Page{
+					PageKey: "site/comp/1.0/ROOT/index.adoc",
+					Title:   "Overview",
+					AbsPath: pageAbsPath,
+				},
+				Action:      model.ActionCreate,
+				ParentID:    "100",
+				Fingerprint: "abc123",
+			},
+		},
+	}
+	rendered := map[string]*model.RenderedPage{
+		"site/comp/1.0/ROOT/index.adoc": {
+			SourcePage: model.Page{AbsPath: pageAbsPath},
+			Title:      "Overview",
+			Body:       "<p>Hello</p>",
+			Images:     []string{"logo.png"},
+		},
+	}
+
+	result := pub.Execute(plan, rendered)
+	assert.Equal(t, 1, result.Created)
+
+	// Find the created page ID
+	var createdID string
+	for id := range mock.pages {
+		createdID = id
+	}
+	require.NotEmpty(t, createdID)
+	assert.Contains(t, mock.attachments[createdID], "logo.png")
 }
