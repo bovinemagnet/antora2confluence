@@ -15,7 +15,7 @@ type PageTitleMap map[string]string
 
 // TransformToConfluence converts asciidoctor HTML5 output into
 // Confluence storage format markup.
-func TransformToConfluence(htmlContent string, pageTitles PageTitleMap) (string, error) {
+func TransformToConfluence(htmlContent string, pageTitles PageTitleMap, mermaidMode string) (string, error) {
 	if htmlContent == "" {
 		return "", nil
 	}
@@ -30,13 +30,13 @@ func TransformToConfluence(htmlContent string, pageTitles PageTitleMap) (string,
 
 	var buf bytes.Buffer
 	for _, n := range nodes {
-		transformNode(&buf, n, pageTitles)
+		transformNode(&buf, n, pageTitles, mermaidMode)
 	}
 
 	return strings.TrimSpace(buf.String()), nil
 }
 
-func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
+func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap, mermaidMode string) {
 	switch n.Type {
 	case html.TextNode:
 		buf.WriteString(n.Data)
@@ -45,7 +45,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 		// handled below
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 		return
 	}
@@ -57,14 +57,14 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 			transformAdmonition(buf, n, class)
 			return
 		case strings.Contains(class, "listingblock"):
-			transformCodeBlock(buf, n)
+			transformCodeBlock(buf, n, mermaidMode)
 			return
 		case strings.Contains(class, "imageblock"):
 			transformImageBlock(buf, n)
 			return
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 		return
 	}
@@ -76,7 +76,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 
 	if n.Data == "span" && strings.Contains(getAttr(n, "class"), "image") {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 		return
 	}
@@ -84,7 +84,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 	if len(n.Data) == 2 && n.Data[0] == 'h' && n.Data[1] >= '1' && n.Data[1] <= '6' {
 		buf.WriteString("<" + n.Data + ">")
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 		buf.WriteString("</" + n.Data + ">")
 		return
@@ -99,7 +99,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 	case "p", "ul", "ol", "li", "strong", "em", "code", "blockquote", "pre", "sup", "sub":
 		buf.WriteString("<" + n.Data + ">")
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 		buf.WriteString("</" + n.Data + ">")
 	case "a":
@@ -124,10 +124,10 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 				buf.WriteString(`</ac:link>`)
 			} else {
 				// Internal link but title not found — render as plain link
-				writePassthroughLink(buf, n, href, pageTitles)
+				writePassthroughLink(buf, n, href, pageTitles, mermaidMode)
 			}
 		} else {
-			writePassthroughLink(buf, n, href, pageTitles)
+			writePassthroughLink(buf, n, href, pageTitles, mermaidMode)
 		}
 	case "br":
 		buf.WriteString("<br/>")
@@ -135,7 +135,7 @@ func transformNode(buf *bytes.Buffer, n *html.Node, pageTitles PageTitleMap) {
 		buf.WriteString("<hr/>")
 	default:
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			transformNode(buf, c, pageTitles)
+			transformNode(buf, c, pageTitles, mermaidMode)
 		}
 	}
 }
@@ -150,14 +150,14 @@ func isInternalLink(href string) bool {
 	return strings.HasSuffix(href, ".html")
 }
 
-func writePassthroughLink(buf *bytes.Buffer, n *html.Node, href string, pageTitles PageTitleMap) {
+func writePassthroughLink(buf *bytes.Buffer, n *html.Node, href string, pageTitles PageTitleMap, mermaidMode string) {
 	buf.WriteString(`<a`)
 	if href != "" {
 		buf.WriteString(fmt.Sprintf(` href="%s"`, href))
 	}
 	buf.WriteString(">")
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		transformNode(buf, c, pageTitles)
+		transformNode(buf, c, pageTitles, mermaidMode)
 	}
 	buf.WriteString("</a>")
 }
@@ -198,7 +198,7 @@ func extractAdmonitionContent(n *html.Node) string {
 	return strings.TrimSpace(buf.String())
 }
 
-func transformCodeBlock(buf *bytes.Buffer, n *html.Node) {
+func transformCodeBlock(buf *bytes.Buffer, n *html.Node, mermaidMode string) {
 	codeNode := findNode(n, "code")
 	if codeNode == nil {
 		codeNode = findNode(n, "pre")
@@ -210,13 +210,24 @@ func transformCodeBlock(buf *bytes.Buffer, n *html.Node) {
 	lang := getAttr(codeNode, "data-lang")
 	var codeBuf bytes.Buffer
 	extractText(&codeBuf, codeNode)
+	codeText := codeBuf.String()
+
+	// Handle mermaid blocks in confluence-macro mode
+	if lang == "mermaid" && mermaidMode == "confluence-macro" {
+		buf.WriteString(`<ac:structured-macro ac:name="mermaid">`)
+		buf.WriteString(`<ac:plain-text-body><![CDATA[`)
+		buf.WriteString(codeText)
+		buf.WriteString(`]]></ac:plain-text-body>`)
+		buf.WriteString(`</ac:structured-macro>`)
+		return
+	}
 
 	buf.WriteString(`<ac:structured-macro ac:name="code">`)
 	if lang != "" {
 		buf.WriteString(fmt.Sprintf(`<ac:parameter ac:name="language">%s</ac:parameter>`, lang))
 	}
 	buf.WriteString(`<ac:plain-text-body><![CDATA[`)
-	buf.WriteString(codeBuf.String())
+	buf.WriteString(codeText)
 	buf.WriteString(`]]></ac:plain-text-body>`)
 	buf.WriteString(`</ac:structured-macro>`)
 }

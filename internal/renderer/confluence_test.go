@@ -9,21 +9,21 @@ import (
 
 func TestTransformToConfluence_Paragraph(t *testing.T) {
 	html := `<div class="paragraph"><p>Hello world.</p></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<p>Hello world.</p>")
 }
 
 func TestTransformToConfluence_Headings(t *testing.T) {
 	html := `<h2 id="_section">Section Title</h2>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<h2>Section Title</h2>")
 }
 
 func TestTransformToConfluence_CodeBlock(t *testing.T) {
 	html := `<div class="listingblock"><div class="content"><pre class="highlight"><code class="language-bash" data-lang="bash">echo hello</code></pre></div></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="code"`)
 	assert.Contains(t, result, "echo hello")
@@ -32,7 +32,7 @@ func TestTransformToConfluence_CodeBlock(t *testing.T) {
 
 func TestTransformToConfluence_CodeBlock_NoLanguage(t *testing.T) {
 	html := `<div class="listingblock"><div class="content"><pre class="highlight"><code>plain code</code></pre></div></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="code"`)
 	assert.Contains(t, result, "plain code")
@@ -40,7 +40,7 @@ func TestTransformToConfluence_CodeBlock_NoLanguage(t *testing.T) {
 
 func TestTransformToConfluence_UnorderedList(t *testing.T) {
 	html := `<div class="ulist"><ul><li><p>Item one</p></li><li><p>Item two</p></li></ul></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<ul>")
 	assert.Contains(t, result, "<li>")
@@ -49,7 +49,7 @@ func TestTransformToConfluence_UnorderedList(t *testing.T) {
 
 func TestTransformToConfluence_OrderedList(t *testing.T) {
 	html := `<div class="olist arabic"><ol class="arabic"><li><p>First</p></li><li><p>Second</p></li></ol></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<ol>")
 	assert.Contains(t, result, "First")
@@ -57,7 +57,7 @@ func TestTransformToConfluence_OrderedList(t *testing.T) {
 
 func TestTransformToConfluence_Table(t *testing.T) {
 	html := `<table class="tableblock frame-all grid-all stretch"><colgroup><col style="width: 50%;"><col style="width: 50%;"></colgroup><thead><tr><th class="tableblock halign-left valign-top">Code</th><th class="tableblock halign-left valign-top">Meaning</th></tr></thead><tbody><tr><td class="tableblock halign-left valign-top"><p class="tableblock">400</p></td><td class="tableblock halign-left valign-top"><p class="tableblock">Bad Request</p></td></tr></tbody></table>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<table>")
 	assert.Contains(t, result, "<th>")
@@ -67,7 +67,7 @@ func TestTransformToConfluence_Table(t *testing.T) {
 
 func TestTransformToConfluence_InlineFormatting(t *testing.T) {
 	html := `<div class="paragraph"><p>This has <strong>bold</strong> and <em>italic</em> and <code>monospace</code> text.</p></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, "<strong>bold</strong>")
 	assert.Contains(t, result, "<em>italic</em>")
@@ -76,7 +76,7 @@ func TestTransformToConfluence_InlineFormatting(t *testing.T) {
 
 func TestTransformToConfluence_Link(t *testing.T) {
 	html := `<div class="paragraph"><p>Visit <a href="https://example.com">Example</a>.</p></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `href="https://example.com"`)
 	assert.Contains(t, result, "Example")
@@ -84,7 +84,7 @@ func TestTransformToConfluence_Link(t *testing.T) {
 
 func TestTransformToConfluence_Image(t *testing.T) {
 	html := `<div class="imageblock"><div class="content"><img src="logo.png" alt="Logo"></div></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="image"`)
 	assert.Contains(t, result, `ri:filename="logo.png"`)
@@ -92,7 +92,7 @@ func TestTransformToConfluence_Image(t *testing.T) {
 
 func TestTransformToConfluence_InlineImage(t *testing.T) {
 	html := `<div class="paragraph"><p>See <span class="image"><img src="icon.png" alt="Icon"></span> here.</p></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="image"`)
 	assert.Contains(t, result, `ri:filename="icon.png"`)
@@ -100,7 +100,7 @@ func TestTransformToConfluence_InlineImage(t *testing.T) {
 
 func TestTransformToConfluence_AdmonitionNote(t *testing.T) {
 	html := `<div class="admonitionblock note"><table><tr><td class="icon"><div class="title">Note</div></td><td class="content">This is a note.</td></tr></table></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="info"`)
 	assert.Contains(t, result, "This is a note.")
@@ -108,7 +108,7 @@ func TestTransformToConfluence_AdmonitionNote(t *testing.T) {
 
 func TestTransformToConfluence_AdmonitionWarning(t *testing.T) {
 	html := `<div class="admonitionblock warning"><table><tr><td class="icon"><div class="title">Warning</div></td><td class="content">Be careful.</td></tr></table></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="warning"`)
 	assert.Contains(t, result, "Be careful.")
@@ -116,7 +116,7 @@ func TestTransformToConfluence_AdmonitionWarning(t *testing.T) {
 
 func TestTransformToConfluence_AdmonitionTip(t *testing.T) {
 	html := `<div class="admonitionblock tip"><table><tr><td class="icon"><div class="title">Tip</div></td><td class="content">A helpful tip.</td></tr></table></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `ac:name="tip"`)
 	assert.Contains(t, result, "A helpful tip.")
@@ -124,14 +124,14 @@ func TestTransformToConfluence_AdmonitionTip(t *testing.T) {
 
 func TestTransformToConfluence_Blockquote(t *testing.T) {
 	html := `<div class="quoteblock"><blockquote><div class="paragraph"><p>A famous quote.</p></div></blockquote></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `<blockquote>`)
 	assert.Contains(t, result, "A famous quote.")
 }
 
 func TestTransformToConfluence_EmptyInput(t *testing.T) {
-	result, err := TransformToConfluence("", nil)
+	result, err := TransformToConfluence("", nil, "passthrough")
 	require.NoError(t, err)
 	assert.Equal(t, "", result)
 }
@@ -139,7 +139,7 @@ func TestTransformToConfluence_EmptyInput(t *testing.T) {
 func TestTransformToConfluence_InternalXref_ConvertsToAcLink(t *testing.T) {
 	pageTitles := PageTitleMap{"getting-started": "Getting Started"}
 	html := `<div class="paragraph"><p>See <a href="getting-started.html">Getting Started</a> for details.</p></div>`
-	result, err := TransformToConfluence(html, pageTitles)
+	result, err := TransformToConfluence(html, pageTitles, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `<ac:link>`)
 	assert.Contains(t, result, `ri:content-title="Getting Started"`)
@@ -150,7 +150,7 @@ func TestTransformToConfluence_InternalXref_ConvertsToAcLink(t *testing.T) {
 func TestTransformToConfluence_ExternalLink_StaysAsATag(t *testing.T) {
 	pageTitles := PageTitleMap{"getting-started": "Getting Started"}
 	html := `<div class="paragraph"><p>Visit <a href="https://example.com">Example</a>.</p></div>`
-	result, err := TransformToConfluence(html, pageTitles)
+	result, err := TransformToConfluence(html, pageTitles, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `<a href="https://example.com">`)
 	assert.NotContains(t, result, `<ac:link>`)
@@ -159,7 +159,7 @@ func TestTransformToConfluence_ExternalLink_StaysAsATag(t *testing.T) {
 func TestTransformToConfluence_InternalXref_UnknownPage_PassesThrough(t *testing.T) {
 	pageTitles := PageTitleMap{}
 	html := `<div class="paragraph"><p>See <a href="unknown.html">Unknown</a>.</p></div>`
-	result, err := TransformToConfluence(html, pageTitles)
+	result, err := TransformToConfluence(html, pageTitles, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `<a href="unknown.html">`)
 	assert.NotContains(t, result, `<ac:link>`)
@@ -167,7 +167,26 @@ func TestTransformToConfluence_InternalXref_UnknownPage_PassesThrough(t *testing
 
 func TestTransformToConfluence_AnchorLink_PassesThrough(t *testing.T) {
 	html := `<div class="paragraph"><p>See <a href="#section">Section</a>.</p></div>`
-	result, err := TransformToConfluence(html, nil)
+	result, err := TransformToConfluence(html, nil, "passthrough")
 	require.NoError(t, err)
 	assert.Contains(t, result, `<a href="#section">`)
+}
+
+func TestTransformToConfluence_MermaidBlock_PassthroughMode(t *testing.T) {
+	html := `<div class="listingblock"><div class="content"><pre class="highlight"><code class="language-mermaid" data-lang="mermaid">graph TD
+    A --> B</code></pre></div></div>`
+	result, err := TransformToConfluence(html, nil, "passthrough")
+	require.NoError(t, err)
+	assert.Contains(t, result, `ac:name="code"`)
+	assert.Contains(t, result, "graph TD")
+}
+
+func TestTransformToConfluence_MermaidBlock_ConfluenceMacroMode(t *testing.T) {
+	html := `<div class="listingblock"><div class="content"><pre class="highlight"><code class="language-mermaid" data-lang="mermaid">graph TD
+    A --> B</code></pre></div></div>`
+	result, err := TransformToConfluence(html, nil, "confluence-macro")
+	require.NoError(t, err)
+	assert.Contains(t, result, `ac:name="mermaid"`)
+	assert.Contains(t, result, "graph TD")
+	assert.NotContains(t, result, `ac:name="code"`)
 }

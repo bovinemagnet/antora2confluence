@@ -12,23 +12,25 @@ import (
 // Renderer converts AsciiDoc pages to Confluence storage format
 // via the asciidoctor CLI and HTML transformation.
 type Renderer struct {
-	pageTitles PageTitleMap
+	pageTitles    PageTitleMap
+	backendConfig BackendConfig
+	mermaidMode   string
 }
 
 // New creates a new Renderer.
-func New() *Renderer {
-	return &Renderer{}
+func New(cfg BackendConfig, mermaidMode string) *Renderer {
+	return &Renderer{backendConfig: cfg, mermaidMode: mermaidMode}
 }
 
 // Render converts a single Page into a RenderedPage by running
 // asciidoctor and transforming the HTML output.
 func (r *Renderer) Render(page model.Page) (*model.RenderedPage, error) {
-	htmlContent, err := ConvertToHTML(page.AbsPath)
+	htmlContent, err := ConvertToHTML(page.AbsPath, r.backendConfig)
 	if err != nil {
 		return nil, fmt.Errorf("rendering %s: %w", page.RelPath, err)
 	}
 
-	body, err := TransformToConfluence(htmlContent, r.pageTitles)
+	body, err := TransformToConfluence(htmlContent, r.pageTitles, r.mermaidMode)
 	if err != nil {
 		return nil, fmt.Errorf("transforming %s: %w", page.RelPath, err)
 	}

@@ -14,7 +14,7 @@ func TestRender_ValidPage_ReturnsRenderedPage(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	page := model.Page{
 		RelPath: "index.adoc",
 		AbsPath: testdataPath("valid-repo/modules/ROOT/pages/index.adoc"),
@@ -35,7 +35,7 @@ func TestRender_PageWithCodeBlock_ContainsCodeMacro(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	page := model.Page{
 		RelPath: "authentication.adoc",
 		AbsPath: testdataPath("valid-repo/modules/api/pages/authentication.adoc"),
@@ -54,7 +54,7 @@ func TestRender_PageWithTable_ContainsTableMarkup(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	page := model.Page{
 		RelPath: "errors.adoc",
 		AbsPath: testdataPath("valid-repo/modules/api/pages/errors.adoc"),
@@ -73,7 +73,7 @@ func TestRender_SameContent_SameFingerprint(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	page := model.Page{
 		RelPath: "index.adoc",
 		AbsPath: testdataPath("valid-repo/modules/ROOT/pages/index.adoc"),
@@ -94,7 +94,7 @@ func TestRender_DifferentPages_DifferentFingerprints(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	page1 := model.Page{
 		RelPath: "index.adoc",
 		AbsPath: testdataPath("valid-repo/modules/ROOT/pages/index.adoc"),
@@ -121,7 +121,7 @@ func TestRenderAll_ValidPages_ReturnsAllRendered(t *testing.T) {
 		t.Skip("asciidoctor not found on PATH, skipping")
 	}
 
-	r := New()
+	r := New(DefaultBackendConfig(), "passthrough")
 	pages := []model.Page{
 		{
 			RelPath: "index.adoc",
