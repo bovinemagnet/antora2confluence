@@ -79,3 +79,23 @@ func Load(path string) (*Config, error) {
 
 	return &cfg, nil
 }
+
+// Validate checks that all required configuration fields are set.
+func (c *Config) Validate() error {
+	if c.Confluence.BaseURL == "" {
+		return fmt.Errorf("confluence.baseUrl is required")
+	}
+	if c.Confluence.SpaceKey == "" {
+		return fmt.Errorf("confluence.spaceKey is required")
+	}
+	if c.Confluence.ParentPageID == "" {
+		return fmt.Errorf("confluence.parentPageId is required")
+	}
+	if c.Source.AntoraRoot == "" {
+		return fmt.Errorf("source.antoraRoot is required")
+	}
+	if c.Source.SiteKey == "" {
+		return fmt.Errorf("source.siteKey is required")
+	}
+	return nil
+}

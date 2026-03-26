@@ -79,3 +79,41 @@ source:
 	assert.Equal(t, "report", cfg.Sync.OrphanStrategy)
 	assert.Equal(t, "component-version-module-page", cfg.Publish.Hierarchy)
 }
+
+func TestValidate_ValidConfig_NoError(t *testing.T) {
+	cfg := &Config{
+		Confluence: ConfluenceConfig{BaseURL: "https://example.atlassian.net/wiki", SpaceKey: "ENG", ParentPageID: "123"},
+		Source:     SourceConfig{AntoraRoot: "./docs", SiteKey: "test"},
+	}
+	require.NoError(t, cfg.Validate())
+}
+
+func TestValidate_MissingBaseURL_ReturnsError(t *testing.T) {
+	cfg := &Config{
+		Confluence: ConfluenceConfig{SpaceKey: "ENG", ParentPageID: "123"},
+		Source:     SourceConfig{AntoraRoot: "./docs", SiteKey: "test"},
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "baseUrl")
+}
+
+func TestValidate_MissingSpaceKey_ReturnsError(t *testing.T) {
+	cfg := &Config{
+		Confluence: ConfluenceConfig{BaseURL: "https://x.atlassian.net/wiki", ParentPageID: "123"},
+		Source:     SourceConfig{AntoraRoot: "./docs", SiteKey: "test"},
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spaceKey")
+}
+
+func TestValidate_MissingSiteKey_ReturnsError(t *testing.T) {
+	cfg := &Config{
+		Confluence: ConfluenceConfig{BaseURL: "https://x.atlassian.net/wiki", SpaceKey: "ENG", ParentPageID: "123"},
+		Source:     SourceConfig{AntoraRoot: "./docs"},
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "siteKey")
+}
