@@ -1,0 +1,107 @@
+= antora2confluence
+Paul Snow
+v0.0.0
+:description: A Go CLI tool for publishing Antora AsciiDoc documentation to Atlassian Confluence Cloud.
+:url-repo: https://github.com/bovinemagnet/antora2confluence
+:toc: macro
+:toc-title: Contents
+
+A Go CLI tool that publishes Antora-structured AsciiDoc documentation into Atlassian Confluence Cloud as a structured page hierarchy.
+
+toc::[]
+
+== What It Does
+
+antora2confluence reads your Antora documentation repository, renders AsciiDoc pages to Confluence storage format, detects what changed since the last publish, and creates or updates only the affected pages in Confluence.
+It is designed for CI/CD pipelines — non-interactive, idempotent, and safe to run on every merge.
+
+=== Key Features
+
+* Incremental publishing — only changed pages are updated
+* Dependency-aware change detection — shared include changes propagate
+* Page hierarchy — Root → Component → Version → Module → Page
+* Image upload — local images become Confluence attachments
+* Internal xref resolution — `xref:` macros become live Confluence links
+* State reconciliation — recovers from lost local state via Confluence properties
+* Dry-run mode — preview exactly what will change before publishing
+
+== Prerequisites
+
+* https://go.dev/dl/[Go] 1.23 or later
+* https://docs.asciidoctor.org/asciidoctor/latest/install/[asciidoctor] Ruby gem
+* A Confluence Cloud instance with an API token
+
+== Quick Start
+
+[source,bash]
+----
+# Build
+go build -o antora-confluence ./cmd/antora-confluence/
+
+# Set credentials
+export CONFLUENCE_USER="you@example.com"
+export CONFLUENCE_TOKEN="your-api-token"
+
+# Validate your Antora source
+./antora-confluence validate --config publish.yaml
+
+# Preview what would be published
+./antora-confluence plan --config publish.yaml
+
+# Publish
+./antora-confluence publish --config publish.yaml
+----
+
+A minimal `publish.yaml`:
+
+[source,yaml]
+----
+confluence:
+  baseUrl: https://yourcompany.atlassian.net/wiki
+  spaceKey: ENG
+  parentPageId: "123456789"
+
+source:
+  antoraRoot: ./docs
+  siteKey: my-docs
+----
+
+== CLI Commands
+
+[cols="1,3"]
+|===
+| Command | Description
+
+| `validate`
+| Scan Antora source and report the content inventory. No Confluence connection required.
+
+| `plan`
+| Dry-run: show planned create/update/skip/orphan actions without making changes.
+
+| `publish`
+| Full pipeline: discover → render → diff → publish → save state → report. Use `--full` to force republish all pages.
+
+| `reconcile-state`
+| Rebuild the local state file from Confluence page properties. Useful when the state file is lost or corrupted.
+|===
+
+Global flags: `--config` (required), `--verbose`, `--help`
+
+== Documentation
+
+Full documentation is maintained as an Antora site in the link:docs/modules/ROOT/pages/[docs/] directory:
+
+* link:docs/modules/ROOT/pages/quick-start.adoc[Quick Start] — step-by-step installation and first publish
+* link:docs/modules/ROOT/pages/configuration.adoc[Configuration Reference] — all `publish.yaml` options with defaults
+* link:docs/modules/ROOT/pages/commands.adoc[CLI Commands] — detailed command reference with examples
+* link:docs/modules/ROOT/pages/architecture.adoc[Architecture] — internal package design and data flow
+* link:docs/modules/ROOT/pages/contributing.adoc[Contributing] — build, test, and project structure
+
+== Project Status
+
+This project is at *v0.0.0* (initial development).
+The MVP is feature-complete with 110+ tests across 10 packages.
+
+== Licence
+
+See link:LICENCE[LICENCE] for details.
