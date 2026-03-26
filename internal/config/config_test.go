@@ -80,6 +80,26 @@ source:
 	assert.Equal(t, "component-version-module-page", cfg.Publish.Hierarchy)
 }
 
+func TestLoad_RenderDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "minimal.yaml")
+	content := `
+confluence:
+  baseUrl: https://example.atlassian.net/wiki
+  spaceKey: ENG
+  parentPageId: "123"
+source:
+  antoraRoot: ./docs
+  siteKey: test
+`
+	os.WriteFile(path, []byte(content), 0644)
+	cfg, err := Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "local", cfg.Render.Backend)
+	assert.Equal(t, "passthrough", cfg.Render.MermaidMode)
+	assert.Equal(t, "antora2confluence/asciidoctor", cfg.Render.DockerImage)
+}
+
 func TestValidate_ValidConfig_NoError(t *testing.T) {
 	cfg := &Config{
 		Confluence: ConfluenceConfig{BaseURL: "https://example.atlassian.net/wiki", SpaceKey: "ENG", ParentPageID: "123"},

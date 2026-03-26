@@ -50,8 +50,12 @@ type SyncConfig struct {
 }
 
 type RenderConfig struct {
-	FailOnUnresolvedXref bool `mapstructure:"failOnUnresolvedXref"`
-	UploadImages         bool `mapstructure:"uploadImages"`
+	Backend              string   `mapstructure:"backend"`
+	Extensions           []string `mapstructure:"extensions"`
+	MermaidMode          string   `mapstructure:"mermaidMode"`
+	DockerImage          string   `mapstructure:"dockerImage"`
+	FailOnUnresolvedXref bool     `mapstructure:"failOnUnresolvedXref"`
+	UploadImages         bool     `mapstructure:"uploadImages"`
 }
 
 func Load(path string) (*Config, error) {
@@ -62,6 +66,9 @@ func Load(path string) (*Config, error) {
 	v.SetDefault("sync.mode", "incremental")
 	v.SetDefault("sync.stateFile", ".antora-confluence-state.json")
 	v.SetDefault("sync.orphanStrategy", "report")
+	v.SetDefault("render.backend", "local")
+	v.SetDefault("render.mermaidMode", "passthrough")
+	v.SetDefault("render.dockerImage", "antora2confluence/asciidoctor")
 	v.SetDefault("render.uploadImages", true)
 	v.SetDefault("confluence.auth.mode", "pat")
 	v.SetDefault("confluence.auth.usernameEnv", "CONFLUENCE_USER")
