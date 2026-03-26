@@ -3,6 +3,7 @@ package diff
 import (
 	"testing"
 
+	"github.com/bovinemagnet/antora2confluence/internal/depgraph"
 	"github.com/bovinemagnet/antora2confluence/internal/model"
 	"github.com/bovinemagnet/antora2confluence/internal/state"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 func TestPlan_NewPage_ReturnsCreate(t *testing.T) {
 	store := state.New("/tmp/test.json")
 	rendered := []model.RenderedPage{{SourcePage: model.Page{PageKey: "site/comp/1.0/ROOT/index.adoc", Title: "Overview"}, Fingerprint: "abc123"}}
-	plan := Plan(rendered, store, false)
+	plan := Plan(rendered, store, false, nil)
 	require.Len(t, plan.Items, 1)
 	assert.Equal(t, model.ActionCreate, plan.Items[0].Action)
 	assert.Equal(t, "abc123", plan.Items[0].Fingerprint)
@@ -23,7 +24,7 @@ func TestPlan_UnchangedPage_ReturnsSkip(t *testing.T) {
 	store := state.New("/tmp/test.json")
 	store.Upsert(state.Entry{PageKey: "site/comp/1.0/ROOT/index.adoc", ConfluenceID: "100", Fingerprint: "abc123"})
 	rendered := []model.RenderedPage{{SourcePage: model.Page{PageKey: "site/comp/1.0/ROOT/index.adoc"}, Fingerprint: "abc123"}}
-	plan := Plan(rendered, store, false)
+	plan := Plan(rendered, store, false, nil)
 	require.Len(t, plan.Items, 1)
 	assert.Equal(t, model.ActionSkip, plan.Items[0].Action)
 	assert.Contains(t, plan.Items[0].Reason, "unchanged")
@@ -33,7 +34,7 @@ func TestPlan_ChangedPage_ReturnsUpdate(t *testing.T) {
 	store := state.New("/tmp/test.json")
 	store.Upsert(state.Entry{PageKey: "site/comp/1.0/ROOT/index.adoc", ConfluenceID: "100", Fingerprint: "old-fingerprint"})
 	rendered := []model.RenderedPage{{SourcePage: model.Page{PageKey: "site/comp/1.0/ROOT/index.adoc"}, Fingerprint: "new-fingerprint"}}
-	plan := Plan(rendered, store, false)
+	plan := Plan(rendered, store, false, nil)
 	require.Len(t, plan.Items, 1)
 	assert.Equal(t, model.ActionUpdate, plan.Items[0].Action)
 	assert.Equal(t, "100", plan.Items[0].ConfluenceID)
@@ -44,7 +45,7 @@ func TestPlan_OrphanedPage_ReturnsOrphan(t *testing.T) {
 	store := state.New("/tmp/test.json")
 	store.Upsert(state.Entry{PageKey: "site/comp/1.0/ROOT/deleted.adoc", ConfluenceID: "999", Fingerprint: "old"})
 	rendered := []model.RenderedPage{{SourcePage: model.Page{PageKey: "site/comp/1.0/ROOT/index.adoc"}, Fingerprint: "abc"}}
-	plan := Plan(rendered, store, false)
+	plan := Plan(rendered, store, false, nil)
 	var orphan, create *model.PlanItem
 	for i := range plan.Items {
 		switch plan.Items[i].Action {
@@ -63,7 +64,7 @@ func TestPlan_FullMode_ForcesUpdateOnUnchanged(t *testing.T) {
 	store := state.New("/tmp/test.json")
 	store.Upsert(state.Entry{PageKey: "site/comp/1.0/ROOT/index.adoc", ConfluenceID: "100", Fingerprint: "abc123"})
 	rendered := []model.RenderedPage{{SourcePage: model.Page{PageKey: "site/comp/1.0/ROOT/index.adoc"}, Fingerprint: "abc123"}}
-	plan := Plan(rendered, store, true)
+	plan := Plan(rendered, store, true, nil)
 	require.Len(t, plan.Items, 1)
 	assert.Equal(t, model.ActionUpdate, plan.Items[0].Action)
 	assert.Contains(t, plan.Items[0].Reason, "full")
@@ -79,7 +80,7 @@ func TestPlan_MixedActions(t *testing.T) {
 		{SourcePage: model.Page{PageKey: "existing-changed"}, Fingerprint: "new-fp"},
 		{SourcePage: model.Page{PageKey: "brand-new"}, Fingerprint: "fp-new"},
 	}
-	plan := Plan(rendered, store, false)
+	plan := Plan(rendered, store, false, nil)
 	actions := make(map[model.Action]int)
 	for _, item := range plan.Items {
 		actions[item.Action]++
@@ -88,4 +89,31 @@ func TestPlan_MixedActions(t *testing.T) {
 	assert.Equal(t, 1, actions[model.ActionUpdate])
 	assert.Equal(t, 1, actions[model.ActionCreate])
 	assert.Equal(t, 1, actions[model.ActionOrphan])
+}
+
+func TestPlan_DependencyPropagation_UpgradesSkipToUpdate(t *testing.T) {
+	store := state.New("/tmp/test.json")
+	// page-a and page-b both include shared.adoc
+	// page-a has changed fingerprint, page-b has not
+	store.Upsert(state.Entry{PageKey: "page-a", ConfluenceID: "1", Fingerprint: "old-a"})
+	store.Upsert(state.Entry{PageKey: "page-b", ConfluenceID: "2", Fingerprint: "fp-b"})
+
+	rendered := []model.RenderedPage{
+		{SourcePage: model.Page{PageKey: "page-a"}, Fingerprint: "new-a", Includes: []string{"shared.adoc"}},
+		{SourcePage: model.Page{PageKey: "page-b"}, Fingerprint: "fp-b", Includes: []string{"shared.adoc"}},
+	}
+
+	graph := depgraph.Build(rendered)
+	plan := Plan(rendered, store, false, graph)
+
+	actions := make(map[string]model.Action)
+	reasons := make(map[string]string)
+	for _, item := range plan.Items {
+		actions[item.Page.PageKey] = item.Action
+		reasons[item.Page.PageKey] = item.Reason
+	}
+
+	assert.Equal(t, model.ActionUpdate, actions["page-a"], "page-a should be updated (fingerprint changed)")
+	assert.Equal(t, model.ActionUpdate, actions["page-b"], "page-b should be updated (dependency changed)")
+	assert.Contains(t, reasons["page-b"], "dependency")
 }

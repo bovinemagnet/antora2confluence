@@ -7,6 +7,7 @@ import (
 
 	"github.com/bovinemagnet/antora2confluence/internal/config"
 	"github.com/bovinemagnet/antora2confluence/internal/confluence"
+	"github.com/bovinemagnet/antora2confluence/internal/depgraph"
 	"github.com/bovinemagnet/antora2confluence/internal/diff"
 	"github.com/bovinemagnet/antora2confluence/internal/discovery"
 	"github.com/bovinemagnet/antora2confluence/internal/renderer"
@@ -64,12 +65,14 @@ func runPlan(cmd *cobra.Command, args []string) error {
 		slog.Warn("Some pages failed to render", "failures", len(renderErrs))
 	}
 
+	graph := depgraph.Build(rendered)
+
 	store := state.New(cfg.Sync.StateFile)
 	if err := store.Load(); err != nil {
 		return fmt.Errorf("loading state: %w", err)
 	}
 
-	plan := diff.Plan(rendered, store, false)
+	plan := diff.Plan(rendered, store, false, graph)
 	reporter.PrintPlan(os.Stdout, plan)
 	fmt.Fprintf(os.Stdout, "\nDry run — no changes made.\n")
 	return nil

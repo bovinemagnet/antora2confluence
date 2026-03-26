@@ -7,6 +7,7 @@ import (
 
 	"github.com/bovinemagnet/antora2confluence/internal/config"
 	"github.com/bovinemagnet/antora2confluence/internal/confluence"
+	"github.com/bovinemagnet/antora2confluence/internal/depgraph"
 	"github.com/bovinemagnet/antora2confluence/internal/diff"
 	"github.com/bovinemagnet/antora2confluence/internal/discovery"
 	"github.com/bovinemagnet/antora2confluence/internal/model"
@@ -74,13 +75,17 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// 4. Build dependency graph
+	graph := depgraph.Build(rendered)
+
+	// 5. Load state and compute diff
 	store := state.New(cfg.Sync.StateFile)
 	if err := store.Load(); err != nil {
 		return fmt.Errorf("loading state: %w", err)
 	}
 
 	isFullMode := fullSync || cfg.Sync.Mode == "full"
-	plan := diff.Plan(rendered, store, isFullMode)
+	plan := diff.Plan(rendered, store, isFullMode, graph)
 
 	reporter.PrintPlan(os.Stdout, plan)
 
