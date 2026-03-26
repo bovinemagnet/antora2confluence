@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/bovinemagnet/antora2confluence/internal/config"
 	"github.com/bovinemagnet/antora2confluence/internal/confluence"
@@ -87,11 +88,33 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	isFullMode := fullSync || cfg.Sync.Mode == "full"
 	plan := diff.Plan(rendered, store, isFullMode, graph)
 
-	reporter.PrintPlan(os.Stdout, plan)
-
 	slog.Info("Publishing pages")
 	renderedMap := makeRenderedMap(rendered)
 	pub := publisher.New(client, cfg.Confluence.ParentPageID, spaceID, cfg.Publish.ApplyLabels)
+
+	// Create hierarchy pages (component/version/module)
+	hierarchy, err := pub.EnsureHierarchy(source)
+	if err != nil {
+		return fmt.Errorf("creating page hierarchy: %w", err)
+	}
+
+	// Set parent IDs for pages that don't have one yet
+	for i := range plan.Items {
+		if plan.Items[i].ParentID == "" && plan.Items[i].Action == model.ActionCreate {
+			// Derive component/version/module from the page key
+			// Key format: <siteKey>/<component>/<version>/<module>/<path>
+			parts := strings.SplitN(plan.Items[i].Page.PageKey, "/", 5)
+			if len(parts) >= 4 {
+				parentID := hierarchy.ParentIDForPage(parts[1], parts[2], parts[3])
+				if parentID != "" {
+					plan.Items[i].ParentID = parentID
+				}
+			}
+		}
+	}
+
+	reporter.PrintPlan(os.Stdout, plan)
+
 	result := pub.Execute(plan, renderedMap)
 
 	for _, pub := range result.PublishedPages {
