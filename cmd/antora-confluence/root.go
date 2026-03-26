@@ -8,8 +8,10 @@ import (
 )
 
 var (
-	cfgFile string
-	verbose bool
+	cfgFile   string
+	verbose   bool
+	useDocker bool
+	usePodman bool
 )
 
 var rootCmd = &cobra.Command{
@@ -29,4 +31,6 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (required)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
+	rootCmd.PersistentFlags().BoolVar(&useDocker, "use-docker", false, "run asciidoctor inside Docker")
+	rootCmd.PersistentFlags().BoolVar(&usePodman, "use-podman", false, "run asciidoctor inside Podman")
 }

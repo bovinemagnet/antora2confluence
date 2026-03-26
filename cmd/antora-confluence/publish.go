@@ -67,7 +67,8 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	slog.Info("Discovered pages", "count", len(pages))
 
 	slog.Info("Rendering pages")
-	r := renderer.New()
+	bc := buildBackendConfig(cfg, cfg.Source.AntoraRoot)
+	r := renderer.New(bc, cfg.Render.MermaidMode)
 	rendered, renderErrs := r.RenderAll(pages)
 	if len(renderErrs) > 0 {
 		slog.Warn("Some pages failed to render", "failures", len(renderErrs))
