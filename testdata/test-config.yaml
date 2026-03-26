@@ -1,0 +1,7 @@
+confluence:
+  baseUrl: https://example.atlassian.net/wiki
+  spaceKey: TEST
+  parentPageId: "1"
+source:
+  antoraRoot: testdata/valid-repo
+  siteKey: test-site

@@ -1,0 +1,2 @@
+* xref:authentication.adoc[Authentication]
+* xref:errors.adoc[Error Handling]

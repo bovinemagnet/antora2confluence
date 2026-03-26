@@ -1,0 +1,8 @@
+= Authentication
+
+All API calls require a bearer token.
+
+[source,bash]
+----
+curl -H "Authorization: Bearer $TOKEN" https://api.example.com/billing
+----

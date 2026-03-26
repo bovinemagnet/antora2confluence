@@ -1,0 +1,16 @@
+= Error Handling
+
+The API returns standard HTTP status codes.
+
+|===
+| Code | Meaning
+
+| 400
+| Bad Request
+
+| 401
+| Unauthorised
+
+| 404
+| Not Found
+|===

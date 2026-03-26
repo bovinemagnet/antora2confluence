@@ -1,0 +1,5 @@
+= Getting Started
+
+Follow these steps to get started with the billing service.
+
+include::partial$setup-steps.adoc[]
