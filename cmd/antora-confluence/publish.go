@@ -89,14 +89,15 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	pub := publisher.New(client, cfg.Confluence.ParentPageID, spaceID, cfg.Publish.ApplyLabels)
 	result := pub.Execute(plan, renderedMap)
 
-	for _, item := range plan.Items {
-		if item.Action == model.ActionCreate || item.Action == model.ActionUpdate {
-			store.Upsert(state.Entry{
-				PageKey:     item.Page.PageKey,
-				Fingerprint: item.Fingerprint,
-				Title:       item.Page.Title,
-			})
-		}
+	for _, pub := range result.PublishedPages {
+		store.Upsert(state.Entry{
+			PageKey:      pub.PageKey,
+			ConfluenceID: pub.ConfluenceID,
+			Fingerprint:  pub.Fingerprint,
+			Title:        pub.Title,
+			ParentID:     pub.ParentID,
+			Version:      pub.Version,
+		})
 	}
 	if err := store.Save(); err != nil {
 		slog.Error("Failed to save state", "error", err)

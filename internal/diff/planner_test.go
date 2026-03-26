@@ -36,7 +36,7 @@ func TestPlan_ChangedPage_ReturnsUpdate(t *testing.T) {
 	plan := Plan(rendered, store, false)
 	require.Len(t, plan.Items, 1)
 	assert.Equal(t, model.ActionUpdate, plan.Items[0].Action)
-	assert.Equal(t, "100", plan.Items[0].ParentID)
+	assert.Equal(t, "100", plan.Items[0].ConfluenceID)
 	assert.Contains(t, plan.Items[0].Reason, "changed")
 }
 

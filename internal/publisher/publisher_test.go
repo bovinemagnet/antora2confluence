@@ -125,10 +125,10 @@ func TestPublish_UpdatesExistingPages(t *testing.T) {
 	plan := model.PublishPlan{
 		Items: []model.PlanItem{
 			{
-				Page:        model.Page{PageKey: "site/billing/1.0/ROOT/index.adoc", Title: "Overview"},
-				Action:      model.ActionUpdate,
-				ParentID:    "200",
-				Fingerprint: "def456",
+				Page:         model.Page{PageKey: "site/billing/1.0/ROOT/index.adoc", Title: "Overview"},
+				Action:       model.ActionUpdate,
+				ConfluenceID: "200",
+				Fingerprint:  "def456",
 			},
 		},
 	}

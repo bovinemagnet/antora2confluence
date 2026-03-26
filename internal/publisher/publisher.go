@@ -42,6 +42,7 @@ func New(client ConfluenceAPI, rootPageID, spaceID string, labels []string) *Pub
 }
 
 // Execute runs the publish plan, creating/updating pages as needed.
+// Returns a result with counts and the list of published pages with their Confluence IDs.
 func (p *Publisher) Execute(plan model.PublishPlan, rendered map[string]*model.RenderedPage) model.PublishResult {
 	result := model.PublishResult{
 		StartedAt: time.Now(),
@@ -54,21 +55,25 @@ func (p *Publisher) Execute(plan model.PublishPlan, rendered map[string]*model.R
 			slog.Debug("Skipping page", "key", item.Page.PageKey)
 
 		case model.ActionCreate:
-			if err := p.createPage(item, rendered); err != nil {
+			pub, err := p.createPage(item, rendered)
+			if err != nil {
 				slog.Error("Failed to create page", "key", item.Page.PageKey, "error", err)
 				result.Failed++
 				result.Errors = append(result.Errors, err)
 			} else {
 				result.Created++
+				result.PublishedPages = append(result.PublishedPages, *pub)
 			}
 
 		case model.ActionUpdate:
-			if err := p.updatePage(item, rendered); err != nil {
+			pub, err := p.updatePage(item, rendered)
+			if err != nil {
 				slog.Error("Failed to update page", "key", item.Page.PageKey, "error", err)
 				result.Failed++
 				result.Errors = append(result.Errors, err)
 			} else {
 				result.Updated++
+				result.PublishedPages = append(result.PublishedPages, *pub)
 			}
 
 		case model.ActionOrphan:
@@ -81,10 +86,10 @@ func (p *Publisher) Execute(plan model.PublishPlan, rendered map[string]*model.R
 	return result
 }
 
-func (p *Publisher) createPage(item model.PlanItem, rendered map[string]*model.RenderedPage) error {
+func (p *Publisher) createPage(item model.PlanItem, rendered map[string]*model.RenderedPage) (*model.PublishedPage, error) {
 	rp := rendered[item.Page.PageKey]
 	if rp == nil {
-		return fmt.Errorf("no rendered content for %s", item.Page.PageKey)
+		return nil, fmt.Errorf("no rendered content for %s", item.Page.PageKey)
 	}
 
 	parentID := item.ParentID
@@ -105,22 +110,36 @@ func (p *Publisher) createPage(item model.PlanItem, rendered map[string]*model.R
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("creating page %s: %w", item.Page.PageKey, err)
+		return nil, fmt.Errorf("creating page %s: %w", item.Page.PageKey, err)
 	}
 
 	slog.Info("Created page", "key", item.Page.PageKey, "id", page.ID, "title", rp.Title)
-	return p.setMetadata(page.ID, item)
-}
+	p.setMetadata(page.ID, item)
 
-func (p *Publisher) updatePage(item model.PlanItem, rendered map[string]*model.RenderedPage) error {
-	rp := rendered[item.Page.PageKey]
-	if rp == nil {
-		return fmt.Errorf("no rendered content for %s", item.Page.PageKey)
+	version := 1
+	if page.Version != nil {
+		version = page.Version.Number
 	}
 
-	existing, err := p.client.GetPage(item.ParentID)
+	return &model.PublishedPage{
+		PageKey:      item.Page.PageKey,
+		ConfluenceID: page.ID,
+		Title:        rp.Title,
+		Fingerprint:  item.Fingerprint,
+		ParentID:     parentID,
+		Version:      version,
+	}, nil
+}
+
+func (p *Publisher) updatePage(item model.PlanItem, rendered map[string]*model.RenderedPage) (*model.PublishedPage, error) {
+	rp := rendered[item.Page.PageKey]
+	if rp == nil {
+		return nil, fmt.Errorf("no rendered content for %s", item.Page.PageKey)
+	}
+
+	existing, err := p.client.GetPage(item.ConfluenceID)
 	if err != nil {
-		return fmt.Errorf("getting page for update %s: %w", item.Page.PageKey, err)
+		return nil, fmt.Errorf("getting page for update %s: %w", item.Page.PageKey, err)
 	}
 
 	newVersion := 1
@@ -141,14 +160,23 @@ func (p *Publisher) updatePage(item model.PlanItem, rendered map[string]*model.R
 		Version: confluence.Version{Number: newVersion},
 	})
 	if err != nil {
-		return fmt.Errorf("updating page %s: %w", item.Page.PageKey, err)
+		return nil, fmt.Errorf("updating page %s: %w", item.Page.PageKey, err)
 	}
 
 	slog.Info("Updated page", "key", item.Page.PageKey, "id", page.ID, "version", newVersion)
-	return p.setMetadata(page.ID, item)
+	p.setMetadata(page.ID, item)
+
+	return &model.PublishedPage{
+		PageKey:      item.Page.PageKey,
+		ConfluenceID: page.ID,
+		Title:        rp.Title,
+		Fingerprint:  item.Fingerprint,
+		ParentID:     existing.ParentID,
+		Version:      newVersion,
+	}, nil
 }
 
-func (p *Publisher) setMetadata(pageID string, item model.PlanItem) error {
+func (p *Publisher) setMetadata(pageID string, item model.PlanItem) {
 	if len(p.labels) > 0 {
 		if err := p.client.AddLabels(pageID, p.labels); err != nil {
 			slog.Warn("Failed to set labels", "pageID", pageID, "error", err)
@@ -168,6 +196,4 @@ func (p *Publisher) setMetadata(pageID string, item model.PlanItem) error {
 	}); err != nil {
 		slog.Warn("Failed to set fingerprint property", "pageID", pageID, "error", err)
 	}
-
-	return nil
 }
