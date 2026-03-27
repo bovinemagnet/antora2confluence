@@ -72,9 +72,9 @@ source:
   siteKey: my-site       # unique key used in page identity strings
 
 publish:
-  hierarchy: true        # create component/version/module parent pages
-  versionMode: append    # how the version label is handled
-  createIndexPages: true # auto-create index pages for hierarchy nodes
+  hierarchy: component-version-module-page
+  versionMode: hierarchy
+  createIndexPages: true
   applyLabels: true      # apply labels to published pages
 
 sync:

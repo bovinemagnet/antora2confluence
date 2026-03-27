@@ -20,6 +20,14 @@ All commands accept a common set of global flags.
 | `false`
 | Enable detailed logging output.
 
+| `--use-docker`
+| `false`
+| Run asciidoctor inside a Docker container instead of using the local binary. Overrides `render.backend` in config.
+
+| `--use-podman`
+| `false`
+| Run asciidoctor inside a Podman container instead of using the local binary. Overrides `render.backend` in config.
+
 | `--help`
 | —
 | Display help for the command.

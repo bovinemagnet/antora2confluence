@@ -24,7 +24,7 @@ go build ./...
 
 == Testing
 
-The project has 110 tests spread across 10 packages.
+The project has 115+ tests spread across 10 packages.
 Run the full test suite:
 
 [source,bash]

@@ -78,8 +78,8 @@ Configures the target Confluence Cloud instance.
 | The numeric ID of the Confluence page that will serve as the root parent for all published content.
 
 | `auth.mode`
-| `env`
-| Authentication mode. Currently only `env` is supported, which reads credentials from environment variables.
+| `pat`
+| Authentication mode. Currently only `pat` (personal access token) is supported, which reads credentials from environment variables.
 
 | `auth.usernameEnv`
 | `CONFLUENCE_USER`
@@ -92,7 +92,7 @@ Configures the target Confluence Cloud instance.
 
 === Environment Variable Credential Resolution
 
-When `auth.mode` is `env`, the tool reads the username and token from the named environment variables at startup.
+When `auth.mode` is `pat`, the tool reads the username and token from the named environment variables at startup.
 If either variable is unset or empty, the tool exits with a clear error message before making any API calls.
 
 [source,bash]
@@ -132,23 +132,20 @@ Controls how content is organised in Confluence.
 | Key | Default | Description
 
 | `hierarchy`
-| `true`
-| When `true`, creates intermediate parent pages for each component, version, and module, producing a structured hierarchy.
-When `false`, all pages are created directly under the root parent page.
+| `component-version-module-page`
+| Controls the page hierarchy structure in Confluence. The default creates intermediate pages for component, version, and module levels.
 
 | `versionMode`
-| `append`
-| Controls how the component version is represented in the page title.
-`append` appends the version string to the component title.
+| `hierarchy`
+| Controls how Antora versions are represented. `hierarchy` creates version nodes in the page tree.
 
 | `createIndexPages`
-| `true`
+| `false`
 | When `true`, automatically creates index pages for hierarchy nodes (components, versions, modules) that do not have an explicit `index.adoc`.
 
 | `applyLabels`
-| `true`
-| When `true`, applies Confluence labels to each published page for traceability.
-Labels include the site key, component name, version, and module.
+| _(empty)_
+| List of Confluence labels to apply to every published page. For example, `["managed-by-antora-confluence", "docs-as-code"]`. Useful for filtering and traceability.
 |===
 
 == `sync` Section
@@ -238,14 +235,13 @@ If omitted, no file is written.
 |===
 | Configuration Key | Default Value
 
-| `confluence.auth.mode` | `env`
+| `confluence.auth.mode` | `pat`
 | `confluence.auth.usernameEnv` | `CONFLUENCE_USER`
 | `confluence.auth.tokenEnv` | `CONFLUENCE_TOKEN`
-| `source.antoraRoot` | `.`
-| `publish.hierarchy` | `true`
-| `publish.versionMode` | `append`
-| `publish.createIndexPages` | `true`
-| `publish.applyLabels` | `true`
+| `publish.hierarchy` | `component-version-module-page`
+| `publish.versionMode` | `hierarchy`
+| `publish.createIndexPages` | `false`
+| `publish.applyLabels` | _(empty)_
 | `sync.mode` | `incremental`
 | `sync.stateFile` | `.antora-confluence-state.json`
 | `sync.orphanStrategy` | `report`
